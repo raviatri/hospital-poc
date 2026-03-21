@@ -11,6 +11,15 @@ export default function handler(req, res) {
 
   const body = req.body || {};
   
+  // Log the incoming request
+  console.log('Incoming webhook request:', JSON.stringify(body, null, 2));
+
+  // If this is a Gupshup event but NOT an incoming message (e.g. read/delivered receipt or billing-event)
+  if (body.type && body.type !== 'message') {
+    console.log(`Received non-message event of type: ${body.type}`);
+    return res.status(200).send('Event received');
+  }
+  
   // Extract user mobile number and message text.
   // This safely handles both a simplified test body and a typical nested Gupshup payload.
   const userMobile = body.mobile || body?.payload?.source || 'unknown';
@@ -44,9 +53,14 @@ export default function handler(req, res) {
     responseMessage = "Type 'Hi' to start";
   }
 
-  // Return the response as JSON format expected by Gupshup/User
-  return res.status(200).json({
+  const responsePayload = {
     type: "text",
     text: responseMessage
-  });
+  };
+
+  // Log the outgoing response
+  console.log('Outgoing webhook response:', JSON.stringify(responsePayload, null, 2));
+
+  // Return the response as JSON format expected by Gupshup/User
+  return res.status(200).json(responsePayload);
 }
