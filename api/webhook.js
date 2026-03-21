@@ -1,37 +1,85 @@
+// DTO Class to parse the incoming webhook request and extract relevant data
+class WebhookRequestDTO {
+  constructor(body) {
+    this.isMessageEvent = false;
+    this.userMobile = 'unknown';
+    this.messageText = null;
+    this.messageType = null;
+    this.rawBody = body;
+    
+    this.parse(body || {});
+  }
+
+  parse(body) {
+    // 1. WhatsApp Business Account / Meta Graph API Format
+    if (body.object === 'whatsapp_business_account' && Array.isArray(body.entry)) {
+      const entry = body.entry[0];
+      if (entry && Array.isArray(entry.changes)) {
+        const value = entry.changes[0].value;
+        if (value && Array.isArray(value.messages)) {
+          const msg = value.messages[0];
+          this.isMessageEvent = true;
+          this.userMobile = msg.from;
+          this.messageType = msg.type;
+          
+          if (this.messageType === 'text' && msg.text) {
+            this.messageText = msg.text.body;
+          }
+          return;
+        } else {
+          // Valid event but not an incoming message (e.g. delivery receipt, status update)
+          this.isMessageEvent = false;
+          return;
+        }
+      }
+    }
+    
+    // 2. Legacy Gupshup payload format
+    if (body.type === 'message') {
+      this.isMessageEvent = true;
+      this.userMobile = body.mobile || body.payload?.source || 'unknown';
+      this.messageText = body.text || body.payload?.payload?.text;
+    } else if (body.type && body.type !== 'message') {
+      this.isMessageEvent = false;
+    } else if (body.text) {
+      // 3. Simple custom test JSON format
+      this.isMessageEvent = true;
+      this.userMobile = body.mobile || 'unknown';
+      this.messageText = body.text;
+    }
+  }
+}
+
 export default function handler(req, res) {
-  // Allow GET requests for Gupshup to verify the webhook URL is active
+  // Allow GET requests for webhook URL verification
   if (req.method === 'GET') {
     return res.status(200).send('Webhook is active');
   }
 
-  // Only allow POST requests for actual messages
+  // Only allow POST requests for actual messages/events
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const body = req.body || {};
-  
   // Log the incoming request
-  console.log('Incoming webhook request:', JSON.stringify(body, null, 2));
+  console.log('Incoming webhook request:', JSON.stringify(req.body, null, 2));
 
-  // If this is a Gupshup event but NOT an incoming message (e.g. read/delivered receipt or billing-event)
-  if (body.type && body.type !== 'message') {
-    console.log(`Received non-message event of type: ${body.type}`);
+  // Parse using our new DTO extraction logic
+  const dto = new WebhookRequestDTO(req.body);
+
+  // If this is a valid event from WhatsApp but NOT an incoming text message, acknowledge and skip
+  if (!dto.isMessageEvent) {
+    console.log('Received non-message event. Acknowledging safely.');
     return res.status(200).send('Event received');
   }
   
-  // Extract user mobile number and message text.
-  // This safely handles both a simplified test body and a typical nested Gupshup payload.
-  const userMobile = body.mobile || body?.payload?.source || 'unknown';
-  let messageText = body.text || body?.payload?.payload?.text;
-
-  if (typeof messageText !== 'string' || !messageText) {
-    // Gupshup often sends an empty or dummy POST payload to verify the webhook works.
-    // Instead of throwing a 400 error, we return 200 OK so they accept the URL.
+  if (typeof dto.messageText !== 'string' || !dto.messageText) {
+    // Acknowledge empty dummy pings or unsupported message types (like images/audio) for POC
+    console.log('Dummy ping or unsupported message type received.');
     return res.status(200).send('Webhook is ready to receive events');
   }
 
-  const normalizedText = messageText.trim().toLowerCase();
+  const normalizedText = dto.messageText.trim().toLowerCase();
 
   // Simple if-else text flow
   let responseMessage;
