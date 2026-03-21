@@ -16,8 +16,10 @@ export default function handler(req, res) {
   const userMobile = body.mobile || body?.payload?.source || 'unknown';
   let messageText = body.text || body?.payload?.payload?.text;
 
-  if (typeof messageText !== 'string') {
-    return res.status(400).json({ error: 'Invalid or missing message text' });
+  if (typeof messageText !== 'string' || !messageText) {
+    // Gupshup often sends an empty or dummy POST payload to verify the webhook works.
+    // Instead of throwing a 400 error, we return 200 OK so they accept the URL.
+    return res.status(200).send('Webhook is ready to receive events');
   }
 
   const normalizedText = messageText.trim().toLowerCase();
