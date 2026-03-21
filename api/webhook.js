@@ -1,5 +1,10 @@
 export default function handler(req, res) {
-  // Only allow POST requests
+  // Allow GET requests for Gupshup to verify the webhook URL is active
+  if (req.method === 'GET') {
+    return res.status(200).send('Webhook is active');
+  }
+
+  // Only allow POST requests for actual messages
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
