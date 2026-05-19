@@ -2,10 +2,15 @@ import { supabase } from '../src/config/supabase.js';
 
 export default async function handler(req, res) {
   try {
-    const tables = ['hospitals', 'doctors', 'patients', 'appointments', 'doctor_slots', 'hospital_media', 'specializations', 'cities', 'states'];
+    const tables = ['hospitals', 'doctors', 'patients', 'appointments', 'doctor_slots', 'hospital_media', 'specializations', 'cities', 'states', 'booking_status_master'];
     const results = {};
 
     for (const table of tables) {
+      if (table === 'booking_status_master') {
+        const { data, error } = await supabase.from(table).select('*');
+        results[table] = error ? { error: error.message } : { data };
+        continue;
+      }
       const { data, error } = await supabase.from(table).select('*').limit(1);
       if (error) {
         results[table] = { error: error.message };
