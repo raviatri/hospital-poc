@@ -380,7 +380,7 @@ export default async function handler(req, res) {
     params.append('message', JSON.stringify(responsePayload));
 
     try {
-      await fetch('https://api.gupshup.io/wa/api/v1/msg', {
+      const response = await fetch('https://api.gupshup.io/wa/api/v1/msg', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -388,7 +388,8 @@ export default async function handler(req, res) {
         },
         body: params.toString()
       });
-      console.log(`Successfully invoked Gupshup HTTP sending API.`);
+      const responseText = await response.text();
+      console.log(`Successfully invoked Gupshup HTTP sending API. Status: ${response.status}. Response: ${responseText}`);
     } catch (e) {
       console.error('Failed to send Gupshup API request:', e);
     }
